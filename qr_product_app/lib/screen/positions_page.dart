@@ -4,6 +4,10 @@ import 'package:barcode_widget/barcode_widget.dart';
 import 'UnscannedProductsPage.dart';
 
 class PositionPage extends StatefulWidget {
+  final Function(String) onProductScanned;
+
+  PositionPage({required this.onProductScanned});
+
   @override
   _PositionPageState createState() => _PositionPageState();
 }
@@ -41,17 +45,30 @@ class _PositionPageState extends State<PositionPage> with SingleTickerProviderSt
     for (var product in fetchedProducts) {
       if (categorizedProducts.containsKey(product['position'])) {
         categorizedProducts[product['position']]!.add(product);
+
+        // إضافة المنتج إلى قائمة المنتجات الممسوحة إذا كانت حالة isScanned صحيحة
+        if (product['isScanned'] == true) {
+          scannedProducts.add(product['_id']);
+        }
       }
     }
     setState(() {});
   }
 
+  void handleProductScanned(String productId) {
+    if (!scannedProducts.contains(productId)) {
+      scannedProducts.add(productId);
+    }
+    fetchProducts(); // Re-fetch products to update the UI
+  }
+
   void deleteProductFromPosition(String productId, String position) async {
     try {
-      final success = await ApiService.deleteProduct(productId); // الاتصال بالخادم
+      final success = await ApiService.deleteProduct(productId);
       if (success) {
         setState(() {
           categorizedProducts[position]?.removeWhere((product) => product['_id'] == productId);
+          scannedProducts.remove(productId);
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('تم حذف المنتج من $position بنجاح!')),
@@ -71,6 +88,9 @@ class _PositionPageState extends State<PositionPage> with SingleTickerProviderSt
   void resetAllProducts() async {
     try {
       await ApiService.resetProductScanStatus();
+      setState(() {
+        scannedProducts.clear();
+      });
       fetchProducts();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('تم إعادة تعيين جميع المنتجات إلى غير مسحوبة!')),
@@ -89,22 +109,21 @@ class _PositionPageState extends State<PositionPage> with SingleTickerProviderSt
         title: Text('Product Position'),
         backgroundColor: Colors.black,
         actions: [
-          IconButton(
-            icon: Icon(Icons.warning),
-            onPressed: () async {
-              // تنقل إلى صفحة UnscannedProductsPage
-              await Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => UnscannedProductsPage(
-                    onProductDeleted: (productId) {
-                      // لا تقم بإزالة المنتج من قائمة المنتجات الممسوحة هنا
-                      // فقط قم بالتعامل مع المتغيرات المستخدمة في UnscannedProductsPage
-                    }
-                )),
-              );
-              // عند العودة، يمكنك إعادة تحميل المنتجات إذا كانت هناك حاجة
-              fetchProducts();
-            },
-          ),
+          // IconButton(
+          //   icon: Icon(Icons.warning),
+          //   onPressed: () async {
+          //     await Navigator.of(context).push(
+          //       MaterialPageRoute(
+          //         builder: (context) => UnscannedProductsPage(
+          //           onProductDeleted: (productId) {
+          //             // لا تقم بإزالة المنتج من قائمة المنتجات الممسوحة هنا
+          //           },
+          //         ),
+          //       ),
+          //     );
+          //     fetchProducts();
+          //   },
+          // ),
         ],
         bottom: TabBar(
           controller: _tabController,
