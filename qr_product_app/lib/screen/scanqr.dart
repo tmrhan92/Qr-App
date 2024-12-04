@@ -9,19 +9,15 @@ class CreateScreen extends StatefulWidget {
 }
 
 class _CreateScreenState extends State<CreateScreen> {
-  var qrstr = '{"productName": "Add Data", "productPosition": "Unknown"}';
   String productName = '';
   String productPosition = '';
+  String qrData = '';
 
   final List<String> knownPositions = [
     'Top',
     'Users',
     'Videos',
     'Sounds',
-    'Top1',
-    'Users1',
-    'Videos1',
-    'Sounds1',
   ];
 
   @override
@@ -52,7 +48,7 @@ class _CreateScreenState extends State<CreateScreen> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     BarcodeWidget(
-                      data: qrstr,
+                      data: qrData,
                       barcode: Barcode.qrCode(),
                       color: Colors.white,
                       height: 250,
@@ -87,23 +83,15 @@ class _CreateScreenState extends State<CreateScreen> {
                         }
 
                         try {
-                          // إرسال البيانات إلى products
-                          await ApiService.sendProductData(productName, productPosition, qrstr, endpoint: 'products');
+                          // إنشاء معرف عشوائي كـ String
+                          String id = DateTime.now().millisecondsSinceEpoch.toString(); // أو استخدم UUID حسب الحاجة
+                          await ApiService.sendProductData(id, productName, productPosition, qrData);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("تم حفظ المنتج بنجاح في المنتجات!")),
-                          );
-
-                          // إرسال البيانات إلى unscanned-products
-                          await ApiService.sendProductData(productName, productPosition, qrstr, endpoint: 'unscanned-products');
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("تم حفظ المنتج بنجاح في المنتجات غير الممسوحة!")),
+                            const SnackBar(content: Text("تم حفظ المنتج بنجاح!")),
                           );
                         } catch (e) {
-                          String errorMessage = e.toString().contains('المنتج موجود بالفعل')
-                              ? "هذا المنتج موجود بالفعل!"
-                              : "حدث خطأ أثناء الحفظ.";
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(errorMessage)),
+                            SnackBar(content: Text("حدث خطأ أثناء الحفظ: $e")),
                           );
                         }
                       },
@@ -127,9 +115,10 @@ class _CreateScreenState extends State<CreateScreen> {
   }
 
   void updateQrString() {
-    qrstr = jsonEncode({
+    qrData = jsonEncode({
       "productName": productName.isNotEmpty ? productName : "Unknown",
       "productPosition": productPosition.isNotEmpty ? productPosition : "Unknown",
+      "_id": DateTime.now().millisecondsSinceEpoch.toString(), // أو استخدم UUID
     });
   }
 
