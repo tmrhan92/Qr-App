@@ -4,10 +4,10 @@ import 'dart:convert';
 import '../api_service.dart';
 
 class QRScannerPage extends StatefulWidget {
-  final Function(String) onProductScanned; // Callback للإبلاغ عندما يتم مسح المنتج
-  final Function(String) onProductDeleted; // Callback لحذف المنتج الممسوح
+  final Function(String) onProductScanned;
+  final Function(String) onProductDeleted;
 
-  QRScannerPage({required this.onProductScanned, required this.onProductDeleted}); // إضافة وحدة الحذف
+  QRScannerPage({required this.onProductScanned, required this.onProductDeleted});
 
   @override
   _QRScannerPageState createState() => _QRScannerPageState();
@@ -76,45 +76,54 @@ class _QRScannerPageState extends State<QRScannerPage> {
     }
 
     try {
-      final productData = jsonDecode(data);
-      print("Parsed Product Data: $productData"); // طباعة البيانات المستخرجة
-      if (productData is! Map<String, dynamic>) {
-        throw Exception("تنسيق QR Code غير صالح");
+      final productData = jsonDecode(data); // فك تشفير البيانات
+      String productName = productData['productName']; // الحصول على اسم المنتج
+      String productPosition = productData['productPosition']; // الحصول على موقع المنتج
+
+      // البحث عن المنتج في قاعدة البيانات باستخدام productName و productPosition
+      final productResponse = await ApiService.fetchProductByNameAndPosition(productName, productPosition);
+
+      if (productResponse.isEmpty) {
+        throw Exception("المنتج غير موجود");
       }
+
+      String productId = productResponse[0]['_id']; // استرداد _id الخاص بالمنتج
+
+      print("Sending Product ID: $productId"); // طباعة المعرف قبل الإرسال
 
       setState(() {
-        isSending = true;
+        isSending = true; // تغيير حالة الواجهة
       });
 
-      String? productId = productData['_id']; // تأكد من أن هذا المفتاح موجود
+      // استدعاء API لتحديث حالة المنتج
+      final response = await ApiService.updateProductScanStatus(productId, true);
 
-      if (productId == null) {
-        throw Exception("Product ID is null");
+      // طباعة حالة الاستجابة
+      print('Response Status Code: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+
+      // التحقق من استجابة الـ API
+      if (response.statusCode == 200) {
+        widget.onProductScanned(productId); // استدعاء الدالة عند المسح الناجح
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("تم مسح المنتج وتحديث الحالة بنجاح!")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("فشل في تحديث حالة المنتج. رمز الخطأ: ${response.statusCode}")),
+        );
       }
-
-      await ApiService.updateProductScanStatus(productId, true);
-      widget.onProductScanned(productId); // Notify the PositionPage
-
-      // Delete the product from UnscannedProductsPage
-      widget.onProductDeleted(productId); // Notify to delete the product from unscanned products
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("تم مسح المنتج وتحديث الحالة بنجاح!")),
-      );
-
-      // Close the QR scanner page
-      Navigator.of(context).pop(true);
     } catch (e) {
-      print('Error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("خطأ أثناء معالجة رمز QR: $e")),
       );
     } finally {
       setState(() {
-        isSending = false;
+        isSending = false; // إعادة تعيين حالة الإرسال
       });
     }
   }
+
 
   @override
   void dispose() {
